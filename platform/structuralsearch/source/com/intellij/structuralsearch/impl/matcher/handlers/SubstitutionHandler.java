@@ -6,11 +6,14 @@ import com.intellij.dupLocator.iterators.NodeIterator;
 import com.intellij.dupLocator.util.NodeFilter;
 import com.intellij.psi.PsiComment;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.structuralsearch.MatchResult;
 import com.intellij.structuralsearch.StructuralSearchProfile;
 import com.intellij.structuralsearch.StructuralSearchUtil;
+import com.intellij.structuralsearch.SyntacticalMatchResult;
 import com.intellij.structuralsearch.impl.matcher.MatchContext;
 import com.intellij.structuralsearch.impl.matcher.MatchResultImpl;
+import com.intellij.structuralsearch.impl.matcher.SyntacticalMatchResultImpl;
 import com.intellij.structuralsearch.impl.matcher.predicates.AndPredicate;
 import com.intellij.structuralsearch.impl.matcher.predicates.MatchPredicate;
 import com.intellij.structuralsearch.impl.matcher.predicates.NotPredicate;
@@ -180,9 +183,9 @@ public class SubstitutionHandler extends MatchingHandler {
       final MatchResultImpl substitution = matchResult.findChild(name);
 
       if (substitution == null) {
-        matchResult.addChild(createMatch(match, start, end) );
+        matchResult.addChild(createMatch(match, start, end, context) );
       } else if (maxOccurs > 1) {
-        final MatchResultImpl result = createMatch(match, start, end);
+        final MatchResultImpl result = createMatch(match, start, end, context);
   
         if (!substitution.isMultipleMatch()) {
           // adding intermediate node to contain all multiple matches
@@ -197,6 +200,10 @@ public class SubstitutionHandler extends MatchingHandler {
 
           substitution.setMatchRef(new SmartPsiPointer(match));
           substitution.setMultipleMatch(true);
+
+          // Not inside the if statement because we effectively "swap" nodes.
+          sonresult.setSyntacticalMatch(substitution.getSyntacticalMatch());
+          substitution.setSyntacticalMatch(null);
 
           if (substitution.isScopeMatch()) {
             substitution.setScopeMatch(false);
@@ -232,7 +239,7 @@ public class SubstitutionHandler extends MatchingHandler {
     return true;
   }
 
-  private MatchResultImpl createMatch(@NotNull final PsiElement match, int start, int end) {
+  private MatchResultImpl createMatch(@NotNull final PsiElement match, int start, int end, MatchContext context) {
     final StructuralSearchProfile profile = StructuralSearchUtil.getProfileByPsiElement(match);
     assert profile != null;
     final String image = profile.getText(match, start, end);
@@ -257,6 +264,40 @@ public class SubstitutionHandler extends MatchingHandler {
       myNestedResult = null;
     }
 
+    if (isTarget()) {
+      PsiElement willBeUsedForReplace = StructuralSearchUtil.getPresentableElement(match);
+      assert PsiTreeUtil.isAncestor(willBeUsedForReplace, match, false);
+
+      List<SyntacticalMatchResultImpl> syntacticalMatches = context.getSyntacticalResults();
+      assert !syntacticalMatches.isEmpty();
+      if (syntacticalMatches.size() == 1) {
+        assert syntacticalMatches.get(0).getPatternElement() == null;
+        assert syntacticalMatches.get(0).getMatchedElement() == null;
+      } else {
+        int i = syntacticalMatches.size();
+        while (i > 1) {
+          PsiElement newCandidate = syntacticalMatches.get(i - 1).getMatchedElement().getElement();
+          if (PsiTreeUtil.isAncestor(willBeUsedForReplace, newCandidate, false)) {
+            i--;
+          } else {
+            break;
+          }
+        }
+        if (i < syntacticalMatches.size()) {
+          assert i >= 1;
+          result.setSyntacticalMatch(syntacticalMatches.get(i));
+          for (SyntacticalMatchResult child : syntacticalMatches.get(i - 1).getChildren()) {
+            if (child == syntacticalMatches.get(i)) {
+              continue;
+            }
+            assert child.getMatchedElement() != null;
+            PsiElement childMatched = child.getMatchedElement().getElement();
+            assert childMatched != null;
+            assert !PsiTreeUtil.isAncestor(willBeUsedForReplace, childMatched, false);
+          }
+        }
+      }
+    }
     return result;
   }
 
@@ -278,6 +319,8 @@ public class SubstitutionHandler extends MatchingHandler {
   private void removeLastResults(int numberOfResults, MatchContext context) {
     if (numberOfResults == 0) return;
     final MatchResultImpl substitution = context.getResult().findChild(name);
+
+    context.getSyntacticalResult().popChildren(numberOfResults);
 
     if (substitution != null) {
       final List<PsiElement> matchedNodes = context.getMatchedNodes();
@@ -323,7 +366,10 @@ public class SubstitutionHandler extends MatchingHandler {
       boolean flag = false;
 
       while(fNodes.hasNext() && matchedOccurs < minOccurs) {
-        if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+        context.pushSyntacticalResult(patternNodes.current(), matchNodes.current());
+        boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+        context.popSyntacticalResult(currentMatched);
+        if (currentMatched) {
           ++matchedOccurs;
         } else if (patternNodes.current() instanceof PsiComment || !(matchNodes.current() instanceof PsiComment)) {
           break;
@@ -343,7 +389,10 @@ public class SubstitutionHandler extends MatchingHandler {
         // go greedily to maxOccurs
 
         while(fNodes.hasNext() && matchedOccurs < maxOccurs) {
-          if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+          context.pushSyntacticalResult(patternNodes.current(), matchNodes.current());
+          boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+          context.popSyntacticalResult(currentMatched);
+          if (currentMatched) {
             ++matchedOccurs;
           } else if (patternNodes.current() instanceof PsiComment || !(matchNodes.current() instanceof PsiComment)) {
             break;
@@ -412,7 +461,10 @@ public class SubstitutionHandler extends MatchingHandler {
               fNodes.advance();
             }
 
-            if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+            context.pushSyntacticalResult(patternNodes.current(), matchNodes.current());
+            boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+            context.popSyntacticalResult(currentMatched);
+            if (currentMatched) {
               matchedOccurs++;
             } else {
               patternNodes.rewind();

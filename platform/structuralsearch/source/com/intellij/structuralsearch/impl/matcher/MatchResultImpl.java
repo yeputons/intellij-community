@@ -3,6 +3,7 @@ package com.intellij.structuralsearch.impl.matcher;
 
 import com.intellij.psi.PsiElement;
 import com.intellij.structuralsearch.MatchResult;
+import com.intellij.structuralsearch.SyntacticalMatchResult;
 import com.intellij.structuralsearch.plugin.util.SmartPsiPointer;
 import com.intellij.util.SmartList;
 
@@ -17,6 +18,8 @@ public final class MatchResultImpl extends MatchResult {
   private String matchImage;
   private final List<MatchResult> myChildren = new SmartList<>();
   private boolean target;
+
+  private SyntacticalMatchResult syntacticalMatch;
 
   private boolean myScopeMatch;
   private boolean myMultipleMatch;
@@ -177,6 +180,16 @@ public final class MatchResultImpl extends MatchResult {
 
   public void setTarget(boolean target) {
     this.target = target;
+  }
+
+  @Override
+  public SyntacticalMatchResult getSyntacticalMatch() {
+    return syntacticalMatch;
+  }
+
+  @Override
+  public void setSyntacticalMatch(SyntacticalMatchResult syntacticalMatch) {
+    this.syntacticalMatch = syntacticalMatch;
   }
 
   @Override

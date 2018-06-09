@@ -13,6 +13,7 @@ import com.intellij.psi.PsiElementVisitor;
 import com.intellij.structuralsearch.MatchResult;
 import com.intellij.structuralsearch.StructuralSearchProfile;
 import com.intellij.structuralsearch.StructuralSearchUtil;
+import com.intellij.structuralsearch.SyntacticalMatchResult;
 import com.intellij.structuralsearch.impl.matcher.filters.LexicalNodesFilter;
 import com.intellij.structuralsearch.impl.matcher.handlers.DelegatingHandler;
 import com.intellij.structuralsearch.impl.matcher.handlers.MatchingHandler;
@@ -23,6 +24,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,8 +78,11 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
 
   @Override
   public boolean matchOptionally(@Nullable PsiElement patternNode, @Nullable PsiElement matchNode) {
-    return patternNode == null && isLeftLooseMatching() ||
+    matchContext.pushSyntacticalResult(patternNode, matchNode);
+    boolean result = patternNode == null && isLeftLooseMatching() ||
            matchSequentially(newSingleNodeIterator(patternNode), newSingleNodeIterator(matchNode));
+    matchContext.popSyntacticalResult(result);
+    return result;
   }
 
   @NotNull
@@ -126,6 +131,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     PsiElement prevElement = myElement;
     myElement = el2;
 
+    matchContext.pushSyntacticalResult(el1, el2);
     try {
       PsiElementVisitor visitor = getVisitorForElement(el1);
       if (visitor != null) {
@@ -138,6 +144,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     finally {
       myElement = prevElement;
     }
+    matchContext.popSyntacticalResult(myResult);
 
     return myResult;
   }
@@ -195,10 +202,12 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     final NodeIterator patternNodes = pattern.getNodes().clone();
     final MatchResultImpl saveResult = matchContext.hasResult() ? matchContext.getResult() : null;
     final List<PsiElement> saveMatchedNodes = matchContext.getMatchedNodes();
+    final List<SyntacticalMatchResultImpl> saveSyntacticalResults = new ArrayList<>(matchContext.getSyntacticalResults());
 
     try {
       matchContext.setResult(null);
       matchContext.setMatchedNodes(null);
+      matchContext.clearSyntacticalResults();
 
       if (!patternNodes.hasNext()) return;
       final MatchingHandler firstMatchingHandler = pattern.getHandler(patternNodes.current());
@@ -223,6 +232,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
 
         matchContext.setMatchedNodes(null);
         matchContext.setResult(null);
+        matchContext.clearSyntacticalResults();
 
         patternNodes.reset();
         if (matchedNodes != null && !matchedNodes.isEmpty() && matched) {
@@ -233,6 +243,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     finally {
       matchContext.setResult(saveResult);
       matchContext.setMatchedNodes(saveMatchedNodes);
+      matchContext.setSyntacticalResults(saveSyntacticalResults);
     }
   }
 
@@ -260,7 +271,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     return ret;
   }
 
-  private static void processNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResultImpl result) {
+  private void processNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResultImpl result) {
     boolean complexMatch = matchedNodes.size() > 1;
     final PsiElement match = matchedNodes.get(0);
 
@@ -277,6 +288,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
       result.setMatchImage(match.getText());
       result.setName(MatchResult.MULTI_LINE_MATCH);
     }
+    result.setSyntacticalMatch(matchContext.getSyntacticalResult());
   }
 
   public void setMatchContext(MatchContext matchContext) {
@@ -295,7 +307,11 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
 
   public boolean matchText(@Nullable PsiElement left, @Nullable PsiElement right) {
     if (left == null) return right == null;
-    return right != null && matchText(left.getText(), right.getText());
+    if (right == null) return false;
+    if (!matchText(left.getText(), right.getText())) return false;
+    //matchContext.pushSyntacticalResult();
+    //matchContext.popSyntacticalResult(true, left, right);
+    return true;
   }
 
   public boolean matchText(String left, String right) {
@@ -307,6 +323,9 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     matchContext.popResult();
 
     if (myResult) {
+      //SwitchLabel?
+      //matchContext.pushSyntacticalResult(patternNode, matchNode);
+      //matchContext.popSyntacticalResult(true);
       if (typedVar) {
         final SubstitutionHandler handler = (SubstitutionHandler)matchContext.getPattern().getHandler(patternNode);
         if (ourResult != null) ourResult.setScopeMatch(true);

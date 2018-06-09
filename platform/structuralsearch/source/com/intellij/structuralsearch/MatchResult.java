@@ -18,6 +18,9 @@ public abstract class MatchResult {
   public abstract int getStart();
   public abstract int getEnd();
 
+  public abstract SyntacticalMatchResult getSyntacticalMatch();
+  public abstract void setSyntacticalMatch(SyntacticalMatchResult syntacticalMatch);
+
   public abstract String getName();
 
   public abstract List<MatchResult> getChildren();

@@ -4,10 +4,13 @@ package com.intellij.structuralsearch.impl.matcher;
 import com.intellij.psi.PsiElement;
 import com.intellij.structuralsearch.MatchOptions;
 import com.intellij.structuralsearch.MatchResultSink;
+import com.intellij.structuralsearch.SyntacticalMatchResult;
+import com.intellij.structuralsearch.plugin.util.SmartPsiPointer;
 import com.intellij.util.containers.Stack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -19,6 +22,7 @@ public class MatchContext {
   private MatchResultSink sink;
   private final Stack<MatchResultImpl> previousResults = new Stack<>();
   private MatchResultImpl result;
+  private final Stack<SyntacticalMatchResultImpl> syntacticalResults = new Stack<>(new SyntacticalMatchResultImpl());
   private CompiledPattern pattern;
   private MatchOptions options;
   private GlobalMatchingVisitor matcher;
@@ -84,12 +88,39 @@ public class MatchContext {
     return result!=null;
   }
 
+  @NotNull
+  public SyntacticalMatchResultImpl getSyntacticalResult() {
+    return syntacticalResults.peek();
+  }
+
+  @NotNull
+  public List<SyntacticalMatchResultImpl> getSyntacticalResults() { return Collections.unmodifiableList(syntacticalResults); }
+
+  public void setSyntacticalResults(List<SyntacticalMatchResultImpl> results) {
+    syntacticalResults.clear();
+    syntacticalResults.addAll(results);
+  }
+
+  public void pushSyntacticalResult(PsiElement patternElement, PsiElement matchedElement) {
+    syntacticalResults.add(new SyntacticalMatchResultImpl(patternElement, new SmartPsiPointer(matchedElement)));
+  }
+
+  public void popSyntacticalResult(boolean matched) {
+    SyntacticalMatchResultImpl newChild = syntacticalResults.pop();
+    if (matched) {
+      newChild.setCompiledPattern(pattern);
+      syntacticalResults.peek().addChild(newChild);
+    }
+  }
+
   public CompiledPattern getPattern() {
     return pattern;
   }
 
   public void setPattern(CompiledPattern pattern) {
     this.pattern = pattern;
+    assert syntacticalResults.size() == 1;
+    getSyntacticalResult().setCompiledPattern(pattern);
   }
 
   public MatchResultSink getSink() {
@@ -103,6 +134,13 @@ public class MatchContext {
   public void clear() {
     result = null;
     pattern = null;
+    clearSyntacticalResults();
+  }
+
+  public void clearSyntacticalResults() {
+    syntacticalResults.clear();
+    syntacticalResults.add(new SyntacticalMatchResultImpl());
+    syntacticalResults.peek().setCompiledPattern(pattern);
   }
 
   public boolean shouldRecursivelyMatch() {
