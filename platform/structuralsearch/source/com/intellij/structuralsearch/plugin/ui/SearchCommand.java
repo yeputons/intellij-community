@@ -21,11 +21,17 @@ import com.intellij.usages.*;
 import com.intellij.util.Processor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+
 public class SearchCommand {
   protected final SearchContext mySearchContext;
   protected final Configuration myConfiguration;
   private MatchingProcess process;
   private FindUsagesProcessPresentation myProcessPresentation;
+  private final List<MatchingDetailsListener> listeners = new ArrayList<>();
 
   public SearchCommand(Configuration configuration, SearchContext searchContext) {
     myConfiguration = configuration;
@@ -35,6 +41,14 @@ public class SearchCommand {
   protected UsageViewContext createUsageViewContext() {
     final Runnable searchStarter = () -> new SearchCommand(myConfiguration, mySearchContext).startSearching();
     return new UsageViewContext(myConfiguration, mySearchContext, searchStarter);
+  }
+
+  public void addListener(MatchingDetailsListener listener) {
+    listeners.add(listener);
+  }
+
+  public void removeListener(MatchingDetailsListener listener) {
+    listeners.remove(listener);
   }
 
   public void startSearching() {
@@ -166,7 +180,9 @@ public class SearchCommand {
     };
 
     try {
-      new Matcher(mySearchContext.getProject()).findMatches(sink, myConfiguration.getMatchOptions());
+      Matcher matcher = new Matcher(mySearchContext.getProject());
+      listeners.forEach(matcher::addListener);
+      matcher.findMatches(sink, myConfiguration.getMatchOptions());
     }
     catch (StructuralSearchException e) {
       myProcessPresentation.setShowNotFoundMessage(false);

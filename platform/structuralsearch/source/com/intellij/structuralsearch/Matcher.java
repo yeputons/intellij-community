@@ -111,6 +111,14 @@ public class Matcher {
     }
   }
 
+  public void addListener(MatchingDetailsListener listener) {
+    matchContext.getObserver().addListener(listener);
+  }
+
+  public void removeListener(MatchingDetailsListener listener) {
+    matchContext.getObserver().removeListener(listener);
+  }
+
   public static void validate(Project project, MatchOptions options) {
     PatternCompiler.compilePattern(project, options, true);
   }
