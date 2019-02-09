@@ -75,8 +75,11 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
 
   @Override
   public boolean matchOptionally(@Nullable PsiElement patternNode, @Nullable PsiElement matchNode) {
-    return patternNode == null && isLeftLooseMatching() ||
+    matchContext.getObserver().fireEnterTryMatching(patternNode, matchNode);
+    boolean result = patternNode == null && isLeftLooseMatching() ||
            matchSequentially(newSingleNodeIterator(patternNode), newSingleNodeIterator(matchNode));
+    matchContext.getObserver().fireExitTryMatching(result);
+    return result;
   }
 
   @NotNull
@@ -125,6 +128,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     PsiElement prevElement = myElement;
     myElement = el2;
 
+    matchContext.getObserver().fireEnterTryMatching(el1, el2);
     try {
       PsiElementVisitor visitor = getVisitorForElement(el1);
       if (visitor != null) {
@@ -137,6 +141,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     finally {
       myElement = prevElement;
     }
+    matchContext.getObserver().fireExitTryMatching(myResult);
 
     return myResult;
   }
@@ -196,6 +201,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     final List<PsiElement> saveMatchedNodes = matchContext.getMatchedNodes();
 
     try {
+      matchContext.getObserver().firePushNewMatchContext();
       matchContext.setResult(null);
       matchContext.setMatchedNodes(null);
 
@@ -222,6 +228,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
 
         matchContext.setMatchedNodes(null);
         matchContext.setResult(null);
+        matchContext.getObserver().fireNewMatchContext();
 
         patternNodes.reset();
         if (matchedNodes != null && !matchedNodes.isEmpty() && matched) {
@@ -230,6 +237,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
       }
     }
     finally {
+      matchContext.getObserver().firePopNewMatchContext();
       matchContext.setResult(saveResult);
       matchContext.setMatchedNodes(saveMatchedNodes);
     }

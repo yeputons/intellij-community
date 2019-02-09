@@ -19,6 +19,7 @@ public class MatchContext {
   private MatchResultSink sink;
   private final Stack<MatchResultImpl> previousResults = new Stack<>();
   private MatchResultImpl result;
+  private final MatchingDetailsObserver observer = new MatchingDetailsObserver();
   private CompiledPattern pattern;
   private MatchOptions options;
   private GlobalMatchingVisitor matcher;
@@ -53,6 +54,10 @@ public class MatchContext {
 
   public void setOptions(MatchOptions options) {
     this.options = options;
+  }
+
+  public MatchingDetailsObserver getObserver() {
+    return observer;
   }
 
   public MatchResultImpl getPreviousResult() {
@@ -101,6 +106,7 @@ public class MatchContext {
 
   public void setPattern(CompiledPattern pattern) {
     this.pattern = pattern;
+    observer.fireSetPattern(pattern);
   }
 
   public MatchResultSink getSink() {
@@ -114,6 +120,7 @@ public class MatchContext {
   public void clear() {
     result = null;
     pattern = null;
+    observer.fireClear();
   }
 
   public boolean shouldRecursivelyMatch() {

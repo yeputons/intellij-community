@@ -190,11 +190,10 @@ public class SubstitutionHandler extends MatchingHandler {
       final MatchResultImpl matchResult = context.getResult();
       final MatchResultImpl substitution = matchResult.findChild(name);
 
+      final MatchResultImpl result = createMatch(match, start, end);
       if (substitution == null) {
-        matchResult.addChild(createMatch(match, start, end) );
+        matchResult.addChild(result);
       } else if (maxOccurs > 1) {
-        final MatchResultImpl result = createMatch(match, start, end);
-  
         if (!substitution.isMultipleMatch()) {
           // adding intermediate node to contain all multiple matches
           final MatchResultImpl sonresult = new MatchResultImpl(
@@ -208,6 +207,7 @@ public class SubstitutionHandler extends MatchingHandler {
 
           substitution.setMatchRef(new SmartPsiPointer(match));
           substitution.setMultipleMatch(true);
+          context.getObserver().fireMoveMatchResult(substitution, sonresult);
 
           if (substitution.isScopeMatch()) {
             substitution.setScopeMatch(false);
@@ -223,6 +223,7 @@ public class SubstitutionHandler extends MatchingHandler {
   
         substitution.addChild(result);
       }
+      context.getObserver().fireOnAddedResult(result);
     }
   }
 
@@ -290,6 +291,8 @@ public class SubstitutionHandler extends MatchingHandler {
     if (numberOfResults == 0) return;
     final MatchResultImpl substitution = context.getResult().findChild(name);
 
+    context.getObserver().fireRemoveLastMatches(numberOfResults);
+
     if (substitution != null) {
       final List<PsiElement> matchedNodes = context.getMatchedNodes();
 
@@ -334,7 +337,10 @@ public class SubstitutionHandler extends MatchingHandler {
       boolean flag = false;
 
       while(fNodes.hasNext() && matchedOccurs < minOccurs) {
-        if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+        context.getObserver().fireEnterTryMatching(patternNodes.current(), matchNodes.current());
+        boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+        context.getObserver().fireExitTryMatching(currentMatched);
+        if (currentMatched) {
           ++matchedOccurs;
         } else if (patternNodes.current() instanceof PsiComment || !(matchNodes.current() instanceof PsiComment)) {
           break;
@@ -354,7 +360,10 @@ public class SubstitutionHandler extends MatchingHandler {
         // go greedily to maxOccurs
 
         while(fNodes.hasNext() && matchedOccurs < maxOccurs) {
-          if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+          context.getObserver().fireEnterTryMatching(patternNodes.current(), matchNodes.current());
+          boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+          context.getObserver().fireExitTryMatching(currentMatched);
+          if (currentMatched) {
             ++matchedOccurs;
           } else if (patternNodes.current() instanceof PsiComment || !(matchNodes.current() instanceof PsiComment)) {
             break;
@@ -423,7 +432,10 @@ public class SubstitutionHandler extends MatchingHandler {
               fNodes.advance();
             }
 
-            if (handler.match(patternNodes.current(), matchNodes.current(), context)) {
+            context.getObserver().fireEnterTryMatching(patternNodes.current(), matchNodes.current());
+            boolean currentMatched = handler.match(patternNodes.current(), matchNodes.current(), context);
+            context.getObserver().fireExitTryMatching(currentMatched);
+            if (currentMatched) {
               matchedOccurs++;
             } else {
               patternNodes.rewind();
