@@ -267,7 +267,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
     return ret;
   }
 
-  private static void processNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResultImpl result) {
+  private void processNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResultImpl result) {
     boolean complexMatch = matchedNodes.size() > 1;
     final PsiElement match = matchedNodes.get(0);
 
@@ -284,6 +284,7 @@ public class GlobalMatchingVisitor extends AbstractMatchingVisitor {
       result.setMatchImage(match.getText());
       result.setName(MatchResult.MULTI_LINE_MATCH);
     }
+    matchContext.getObserver().fireOnNoSubstitutionMatch(matchedNodes, result);;
   }
 
   public void setMatchContext(MatchContext matchContext) {

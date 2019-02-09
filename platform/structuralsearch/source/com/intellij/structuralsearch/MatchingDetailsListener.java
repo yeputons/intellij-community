@@ -5,6 +5,8 @@ import com.intellij.psi.PsiElement;
 import com.intellij.structuralsearch.impl.matcher.CompiledPattern;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
+
 public interface MatchingDetailsListener {
   void setPattern(CompiledPattern pattern);
 
@@ -23,6 +25,8 @@ public interface MatchingDetailsListener {
   void removeLastMatches(int numberOfResults);
 
   void onAddedResult(MatchResult result);
+
+  void onNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResult result);
 
   void moveMatchResult(@NotNull MatchResult from, @NotNull MatchResult to);
 }

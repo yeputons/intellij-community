@@ -7,6 +7,7 @@ import com.intellij.structuralsearch.MatchingDetailsListener;
 import com.intellij.util.containers.hash.HashSet;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Set;
 
 public class MatchingDetailsObserver {
@@ -54,6 +55,10 @@ public class MatchingDetailsObserver {
 
   public void fireOnAddedResult(MatchResult result) {
     listeners.forEach(c -> c.onAddedResult(result));
+  }
+
+  public void fireOnNoSubstitutionMatch(List<PsiElement> matchedNodes, MatchResult result) {
+    listeners.forEach(c -> c.onNoSubstitutionMatch(matchedNodes, result));
   }
 
   public void fireMoveMatchResult(@NotNull MatchResult from, @NotNull MatchResult to) {
